@@ -1,0 +1,48 @@
+#lang racket
+
+(define +input+ 325489)
+
+(define (in-bounds point bounds)
+  (and (<= (caar bounds)
+           (car point)
+           (cadr bounds))
+       (<= (cdar bounds)
+           (cdr point)
+           (cddr bounds))))
+
+(define (update-known-bounds point bounds)
+  (cond ((> (caar bounds) (car point))
+         (setf (caar bounds) (1- (caar bounds))))
+        ((> (car point) (cadr bounds))
+         (setf (cadr bounds) (1+ (cadr bounds))))
+        ((> (cdar bounds) (cdr point))
+         (setf (cdar bounds) (1- (cdar bounds))))
+        ((> (cdr point) (cddr bounds))
+         (setf (cddr bounds) (1+ (cddr bounds))))
+        (t (error "Illegal State")))
+  bounds)
+
+(define (point-+ point-1 point-2)
+  (cons (+ (car point-1)
+           (car point-2))
+        (+ (cdr point-1)
+           (cdr point-2))))
+
+(define (%build-grid room-number limit current-position known-bounds directions)
+  (cond ((= room-number limit) current-position)
+        ((in-bounds current-position known-bounds)
+         (%build-grid (1+ room-number) limit (point-+ current-position (car directions)) known-bounds directions))
+        (t (let ((new-position (point-+ current-position (cadr directions))))
+             (%build-grid (1+ room-number) limit  new-position (update-known-bounds new-position known-bounds) (cdr directions))))))
+
+(define (next-direction directions)
+
+(define (build-grid limit)
+  (let ((point (cons 0 0))
+        (known-bounds (cons (cons 0 0)
+                            (cons 0 0)))
+        (direction '#1=(( 1 .  0)
+                        ( 0 .  1)
+                        (-1 .  0)
+                        ( 0 . -1) . #1#)))
+    (%build-grid 0 limit point known-bounds direction)))
