@@ -1,108 +1,123 @@
 (defpackage "DAY/7"
-  (:use "CL"))
+  (:use "CL"
+        "SPLIT-SEQUENCE"))
 (in-package "DAY/7")
 
-(defparameter +input+ #P"/home/puercopop/quicklisp/local-projects/playground/advent-of-code/2015/7.input")
+(defparameter +input+ #P"7.input")
 
-(deftype token ()
-  `(cons keyword t))
+(defun ~ (n)
+  (let* ((length (integer-length n))
+         (negation (mask-field (byte length 0)
+                               (lognot n))))
+    (if (zerop negation)
+        (dpb 1 (byte 1 length) 0)
+        negation)))
 
-(defun tok (type val)
-  (cons type val))
+(defun keywordicate (string)
+  (sb-int:keywordicate (string-upcase
+                        (string-trim '(#\Space) string))))
 
-#|
-Tokens
+(defun integer-or-symbol (x)
+  (handler-case (values (parse-integer x) :input)
+        (sb-int:simple-parse-error () (values (keywordicate x) :cable))))
 
-:gate-id
-:number
-:then
-:logic-gate
-|#
+(defun rule-type (lhs)
+  (ecase (length lhs)
+    (1 :input)
+    (2 :unary)
+    (3 :binary)))
 
-(alexa:define-string-lexer instruction-lexer
-  ((:num "\\d+")
-   (:gate-id "\\w+")
-   (:-> "->"))
-  ("{{GATE-ID}}" (return (tok :gate-id $@)))
-  ("{{NUM}}" (return (tok :number (parse-integer $@))))
-  ("->" (return (tok :then nil)))
-  ("NOT" (return (tok :logic-gate :not)))
-  ("AND" (return (tok :logic-gate :and)))
-  ("OR" (return (tok :logic-gate :or)))
-  ("RSHIFT" (return (tok :logic-gate :rshift)))
-  ("LSHIFT" (return (tok :logic-gate :lshift)))
-  ("\\s+" nil))
+(defgeneric make-rule (type lhs out)
+  (:documentation "Return"))
 
-(defun lex-line (string)
-  (loop :with lexer := (instruction-lexer string)
-        :for tok := (funcall lexer)
-        :while tok
-        :collect tok))
-(lex-line "lf AND lq -> ls")
+(defmethod make-rule ((type (eql :input)) lhs out)
+  (multiple-value-bind (in type)
+      (integer-or-symbol (car lhs))
+      (list :type type
+            :in in
+            :out out)))
 
-(defun lex (in)
-  (loop :for line := (read-line in nil 'eof)
-        :until (eq 'eof line)
-        :append (lex-line line)
-        ;; :append '(:instruction-end)
-        ))
+(defmethod make-rule ((type (eql :unary)) lhs out)
+  (list :type type
+        :in (keywordicate (second lhs))
+        :op (keywordicate (first lhs))
+        :out out))
 
-(with-open-file (in +input+)
-  (lex in))
+(defmethod make-rule ((type (eql :binary)) lhs out)
+  (let* ((lhs (mapcar #'integer-or-symbol lhs))
+         (op (elt lhs 1))
+         (in-1 (elt lhs 0))
+         (in-2 (elt lhs 2)))
+    (list :type type
+          :op op
+          :in-1 in-1
+          :in-2 in-2
+          :out out)))
 
-;; (defparameter +wires+ (make-hash-table :test 'equalp))
-(defparameter +wires+ ())
+(defun parse-line (line)
+  (let* ((->-index (1- (position #\> line :from-end t)))
+         (out (keywordicate (subseq line (+ 2 ->-index))))
+         (lhs (string-trim '(#\Space) (subseq line 0 ->-index)))
+         (lhs (split-sequence #\Space lhs)))
+    (make-rule (rule-type lhs) lhs out)))
 
+;; (parse-line "iu RSHIFT 1 -> jn")
+;; (parse-line "NOT kt -> ku") ; => (:TYPE :UNARY :IN :KT :OP :NOT :OUT :KU)
 
-;; Assumiendo que no hay referencias a gate ids en el lhs antes que rhs
+(defgeneric compute (var-or-val))
 
-#|
-Parser grammar
+(defmethod compute ((x integer))
+  x)
 
-<input> := <gate-id> | <num>
+(defun expand-body (rule)
+  (ecase (getf rule :type)
+    (:cable `(compute ,(getf rule :in)))
+    (:input (getf rule :in))
+    (:unary `(~ (compute ,(getf rule :in))))
+    (:binary (ecase (getf rule :op)
+               (:rshift `(ash (compute ,(getf rule :in-1))
+                              (* -1 (compute ,(getf rule :in-2)))))
+               (:lshift `(ash (compute ,(getf rule :in-1))
+                              (compute ,(getf rule :in-2))))
+               (:and `(logand (compute ,(getf rule :in-1))
+                              (compute ,(getf rule :in-2))))
+               (:or `(logior (compute ,(getf rule :in-1))
+                              (compute ,(getf rule :in-2))))))))
 
-<left-side> := NOT <gate-id> -> <gate-id> |
-               <gate-id> RSHIFT <num> |
-               <gate-id> LSHIFT <num> |
-               <input> AND <input> |
-               <input> OR <input> |
-<left-side> -> <gate-id>
-|#
+(defun expand-to-method (rule)
+  (let ((out (getf rule :out))
+        (method-body (expand-body rule)))
+    `(defmethod compute ((x (eql ,out)))
+       ,method-body)))
 
-(yacc:define-parser instruction-parser
-  (:start-symbol expression)
-  (:terminals :gate-id :number :then :logic-gate :not :rshift :lshift :and :or :then)
-  (expression
-   (left-side :then gate-id (lambda (x y z) (list x :foobar z))))
+(defparameter +memo+ (make-hash-table))
 
-  ;; (-> (:then nil))
+(defmethod compute :around (x)
+  (let ((cache (gethash x +memo+)))
+    (if cache
+        cache
+        (let ((result (call-next-method)))
+          (setf (gethash x +memo+)
+                result)
+          result))))
 
-  (input gate-id
-         number)
+#+nil
+(macrolet ((define-methods ()
+             (with-open-file (in +input+)
+               `(progn
+                  ,@(loop
+                      :for line := (read-line in nil)
+                      :while line
+                      :collect (expand-to-method (parse-line line)))))))
+  (define-methods))
 
-  (gate-id :gate-id string)
-  (number (:number string-parsr))
-  
-  (left-side
-   not-gate-expression
-   and-gate-expression
-   or-gate-expression
-   rshift-gate-expression
-   lshift-gate-expression)
+#+puzzle-1
+(compute :a) ;; => 16076 (14 bits, #x3ECC)
 
-  (not-gate (:logic-gate :not))
-  (and-gate (:logic-gate :and))
-  (or-gate (:logic-gate :or))
-  (rshift-gate (:logic-gate :rshift))
-  (lshift-gate (:logic-gate :lshift))
+#+for-puzzle-2
+(defmethod compute ((x (eql :b)))
+  16076)
 
-  (not-gate-expression (not-gate input))
-  (and-gate-expression (input and-gate input))
-  (or-gate-expression (input or-gate input))
-  (rshift-gate-expression (input :rshift number))
-  (lshift-gate-expression (input :rshift number))
-  
-  
-  
-  (term))
+#+puzzle-2
+(compute :a) ;; => 2797 (12 bits, #xAED)
 
