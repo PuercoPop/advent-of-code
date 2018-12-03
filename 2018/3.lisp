@@ -99,7 +99,7 @@
                     :when (and claims
                                (> (length claims) 1))
                       :do (setf dup-ids
-                                (remove-duplicates (append dup-ids claims)))))
+                                (union dup-ids claims))))
     (set-difference claim-ids dup-ids)))
 
 (defun solve-2 (claims)

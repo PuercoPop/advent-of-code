@@ -42,12 +42,9 @@
                                3-count)))))
 
 (defun compare-words (word-1 word-2)
-  (loop :with count := 0
-        :for i :below (length word-1)
-        :when (char/= (aref word-1 i)
-                     (aref word-2 i))
-          :do (incf count)
-        :finally (return count)))
+  (loop :for i :below (length word-1)
+        :count (char/= (aref word-1 i)
+                       (aref word-2 i))))
 
 (defun solve-2 ()
   (let ((words (with-open-file (in +input+)
