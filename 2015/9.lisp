@@ -45,7 +45,7 @@
          (routep (lambda (x)
                   (or (equal x route)
                       (equal x reverse-route)))))
-    (loop :for (pair . distance):in (distance +graph+)
+    (loop :for (pair . distance) :in (distance +graph+)
           :when (funcall routep pair)
             :do (return distance))
     (error "Impossible state")))
@@ -62,11 +62,12 @@
 
 (defun permute (list)
   (if list
-    (mapcan #'(lambda (x)
-		(mapcar #'(lambda (y) (cons x y))
-			(permute (remove x list))))
-	    list)
-    '(()))) ; else
+      (mapcan #'(lambda (x)
+                  (mapcar #'(lambda (y) (cons x y))
+                          (permute (remove x list))))
+              list)
+      '(()))) ; else
+
 (defun all-routes (cities)
   (if cities
     (mapcan #'(lambda (x)
