@@ -1,7 +1,7 @@
 (in-package #:cl-user)
 
 (defvar *input-file*
-  #P"/home/puercopop/quicklisp/local-projects/playground/advent-of-code/2.input")
+  #P"/home/puercopop/quicklisp/local-projects/playground/advent-of-code/2015/2.input")
 
 (defun l (dimensions)
   (first dimensions))
