@@ -5,6 +5,7 @@
 
 (defparameter +input+ "......^.^^.....^^^^^^^^^...^.^..^^.^^^..^.^..^.^^^.^^^^..^^.^.^.....^^^^^..^..^^^..^^.^.^..^^..^^^..")
 (defparameter +test+ "..^^.")
+(defparameter +test-2+ ".^^.^.^^^^")
 
 (defun trap? (&rest prev-tiles)
   ;; left center right
@@ -18,35 +19,57 @@
 (trap? :safe :safe :safe) ; => :SAFE
 (trap? :safe :safe :trap) ; => :TRAP
 
-(defclass world ()
-  ((grid :initarg :grid :initform (make-hash-table :test 'equalp) :accessor grid)
-   (left-bound :initarg :left-bound :reader left-bound)
-   (right-bound :initarg :right-bound :reader right-bound)))
-
-(defmethod print-object ((obj world) stream)
-  (print-unreadable-object (obj stream :type t)
-    (dotimes (i (right-bound obj))
-      (format stream "~A" (if (eq :safe (gethash i (grid obj)))
-                              #\.
-                              #\^)))))
-
-(defun out-of-bounds (world))
-
-(defun seed-world (input)
-  (let ((left-bound 0)
-        (right-bound (length input))
-        (grid (make-hash-table :test 'equalp)))
-    (loop :for tile :across input
+(defun make-world (first-line)
+  (let* ((line-length (length first-line))
+         (line (make-array line-length :initial-element nil))
+         (world (make-array 400000 :fill-pointer 0)))
+    (loop :for cell :across first-line
+          :for cell-state := (if (eq cell #\.)
+                                 :safe
+                                 :trap)
           :for x :from 0
-          :do (setf (gethash (complex x 0) grid)
-                    (if (char= tile #\.)
-                        :safe
-                        :trap)))
+          :do (setf (aref line x) cell-state))
+    (vector-push line world)
+    world))
 
-    (make-instance 'world :grid grid
-                          :left-bound left-bound
-                          :right-bound right-bound)))
+(defun aref* (array ix)
+  (handler-case (aref array ix)
+    (sb-int:invalid-array-index-error () :safe)))
 
-(defun compute-row (y)
-  )
-(compute-row 1)
+(defun compute-row (world y)
+  (let* ((prev-row (aref world (1- y)))
+         (row-length (length prev-row))
+         (next-row (make-array row-length :initial-element nil)))
+    (loop :for ix :from 0 :below row-length
+          :for left-cell   := (aref* prev-row (1- ix))
+          :for middle-cell := (aref* prev-row ix)
+          :for right-cell  := (aref* prev-row (1+ ix))
+          :for next-cell := (trap? left-cell middle-cell right-cell)
+          :do (setf (aref next-row ix)
+                    next-cell))
+    next-row))
+
+(defun add-row (world)
+  (let ((new-row (compute-row world (length world))))
+    (vector-push new-row world)
+    world))
+
+(defun build-world (input depth)
+  (let ((world (make-world input)))
+    (loop :repeat (1- depth)
+          :do (add-row world))
+    world))
+
+(defun count-safe-tiles (world)
+  (loop :for row :across world
+        :sum (loop :for cell :across row
+                   :count (eq cell :safe))))
+
+
+(defun solve/1 (input depth)
+  (let ((world (build-world input depth)))
+    (count-safe-tiles world)))
+
+(solve/1 +input+ 40) ; => 1963 (11 bits, #x7AB)
+
+(solve/1 +input+ 400000)
