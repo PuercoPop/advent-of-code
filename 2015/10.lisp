@@ -1,81 +1,36 @@
 (defpackage "DAY/10"
-  (:use "CL"
-        "ALEXANDRIA"))
+  (:use "CL"))
 (in-package "DAY/10")
 
-(defun concat (&rest strings)
-  (apply 'concatenate 'string strings))
+(defun look (in)
+  "Transform the input into a sequence of (digit . count). INPUT is a
+string of digits."
+  (let* ((current-digit (char in 0))
+         (current-pair (cons 1 current-digit)))
+    (append (loop :with len := (length in)
+                   :for char :across (subseq in 1)
+                   :when (char/= current-digit char)
+                     :collect (prog1 current-pair
+                                (setf current-digit char
+                                      current-pair (cons 0 char)))
+                   :when (char= current-digit char)
+                     :do (incf (car current-pair)))
+            (list current-pair))))
 
-(defun times-repeated-p (input)
-  "Returns three values:
-   1. The number of times the digit is repeated.
-   2. The digit that is repeated
-   3. The rest of the sequence"
-  (let ((digit-char (aref input 0))
-        
-        (times (loop :for index :from 0 :upto (1- (length input))
-                     :until (char/= (aref input 0)
-                                    (aref input index))
-                     :finally (return index))))
-    (values times (digit-char-p digit-char) (subseq input times))))
+(defun say (seq)
+  "Transforms a sequence of pairs with the form (digit . count) to a string of digits"
+  (with-output-to-string (out)
+    (loop :for (count . digit) :in seq
+          :do (format out "~A~A" count digit))))
 
-(times-repeated-p "11")
-(times-repeated-p "111221") ; => 3, 1, "221"
-;; => "3", "1", "221"
+(defun solve/1 (input times)
+  (let ((in input))
+    (loop :repeat times
+          :for seq := (look in)
+          :do ;; (format t "• ~A : ~A~%" in seq)
+              (setf in (say seq)))
+    (values (length in) in)))
 
-(defun string->alist (input)
-  "Transform to an alist representation of the sequence."
-  (labels ((iter (input alist)
-             (cond ((string= "" input) (reverse alist))
-                   (t (multiple-value-bind (times digit rest)
-                          (times-repeated-p input)
-                        (iter rest (acons times digit alist)))))))
-    (iter input nil)))
-(string->alist "1") ; => ((1 . 1))
-(string->alist "11") ; => ((2 . 1))
-(string->alist "21") ; => ((1 . 2) (1 . 1))
-(string->alist "1211") ; => ((1 . 1) (1 . 2) (2 . 1))
-(string->alist "111221") ; => ((3 . 1) (2 . 2) (1 . 1))
-(string->alist "3122111") ; => ((1 . 3) (1 . 1) (2 . 2) (3 . 1))
+(solve/1 "1113122113" 40) ; => 360154, "31131122211311123113321112131221123113111231121113311211131221121321131211132221123113112211121312211231131122211211133112111311222112111312211312111322211213211321322123211211131211121332211231131122...[sly-elided string of length 360154]"
 
-(defun count-digits (alist)
-  (reduce '+ alist :key 'car))
-(count-digits (string->alist "111221"))
-
-(flatten (string->alist "111221"))
-(defun group-by-number (xs)
-  (labels ((iter (xs last-digit count result)
-             (cond ((endp xs) result)
-                   ((eql last-digit (car xs)))
-                   )))))
-
-
-(defun next (alist)
-  (loop :for cons :in alist
-        :collect (cons (cdr cons) (car cons))))
-(next (string->alist "1"))
-
-(defun next (input)
-  (labels ((iter (input next)
-             (multiple-value-bind (times digit rest) (times-repeated-p input)
-               (cond ((string= rest "") (concat next times digit))
-                     (t (iter rest (concat next times digit)))))))
-      (iter input "")))
-
-(defun expand (input times)
-  (loop :repeat times
-        :do (setf input (next input))
-        :finally (return (length input))))
-
-(defun expand* (input times)
-  (cond ((zerop times) (length input))
-        (t (expand* (next input) (1- times)))))
-
-;; (next "1")
-;; (next "11") ; => "21"
-;; (next "1211") ; => "111221"
-;; (next "111221")
-;; (expand* "1" 3)
-;; (expand "1113122113" 30)
-;; (expand "1113122113" 40)
-;; (expand* "1113122113" 40)
+(solve/1 "1113122113" 50) ; => 5103798, "13211321322113311213212312311211131122211213211331121321123123211231131122211211131221131112311332211213211321223112111311222112132113213221123123211231132132211231131122211311123113322112111312211312...[sly-elided string of length 5103798]"
