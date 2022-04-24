@@ -46,7 +46,7 @@
 ;; letters, like abc, bcd, cde, and so on, up to xyz. They cannot skip
 ;; letters; abd doesn't count.
 
-(defun contains-flush-p (input)
+(defun flushp (input)
   (loop :for char :across input
         :for a := #\Space :then b
         :for b := #\Space :then c
@@ -70,58 +70,47 @@
                 (char= x #\l)))
           input))
 
+(assert (only-allowed-chars-p "cde"))
+(assert (not (only-allowed-chars-p "cdie")))
+
 ;; Rule 3
 ;;
 ;; Passwords must contain at least two different, non-overlapping
 ;; pairs of letters, like aa, bb, or zz.
 
 ;; Bug because it doesn't enforce non-overlapping
+;; (defun third-rule-p (input)
+;;   (cl-ppcre:scan "/(.)\1.*?(.)\2/" input))
+
+(defun chomp (xs)
+  (let* ((char (char xs 0))
+         (count (position char xs :test #'char/= :start 1)))
+    (values (cons char (or count (length xs)))
+            (subseq xs (or count (length xs))) )))
 
 (defun third-rule-p (input)
-  (cl-ppcre:scan "/(.)\1.*?(.)\2/" input))
-
-(defun third-rule-p (input)
-  (let ((successive-count 0)
-        (matched-chars (list))
-        (contiguous-match-p nil))
-    (reduce (lambda (x y)
-              (if (char= x y)
-                  (if contiguous-match-p
-                    (setf contiguous-match-p nil)
-                    (progn
-                      (incf successive-count)
-                      (setf matched-chars  (adjoin x matched-chars))
-                      (setf contiguous-match-p t)))
-                  (setf contiguous-match-p nil))
-              y)
-            input)
-    (values (and (>= successive-count 2)
-                 (>= (length matched-chars) 2))
-            successive-count
-            matched-chars)))
-
-(defun third-rule-p (input)
-  (<= 2 (loop :for char :across input
-              :for a := #\Space :then b
-              :for b := #\Space :then c
-              :for c := char
-              :for a-code := (char-code a)
-              :for b-code := (char-code b)
-              :for c-code := (char-code c)
-              :when (and (/= a-code b-code)
-                         (= b-code c-code))
-                :count 1)))
+  (labels ((iter (in successive-count)
+             (cond ((>= successive-count 2) t)
+                   ((zerop (length in)) nil)
+                   (t (multiple-value-bind (m rest)
+                          (chomp in)
+                        (iter rest (+ successive-count (if (< 1 (cdr m))
+                                                           1
+                                                           0))))))))
+    (iter input 0)))
 
 (defun valid-password-p (input)
-  (and (contains-flush-p input)
+  (and (plusp (flushp input))
        (only-allowed-chars-p input)
        (third-rule-p input)))
+
+(assert (not (valid-password-p "hijklmmn")))
+(assert (not (valid-password-p "abbceffg")))
+(assert (not (valid-password-p "abbcegjk")))
 
 (defun solve/1 (input)
   (loop :for password := (next-input input) :then (next-input password)
         :until (valid-password-p password)
         :finally (return password)))
 
-(solve/1 +input+) ; => "cqjxkkaa"
-;; (solve/1 "abcdefgh")
-;; (solve/1 "ghijklmn")
+(solve/1 +input+) ; => "cqjxxyzz"
