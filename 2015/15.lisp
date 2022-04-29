@@ -7,6 +7,33 @@
 (defparameter +input+ #P"15.input")
 (defparameter +example+ #P"15.example")
 
+#|
+
+Ok, so I'm blowing the heap. Time to do some estimations about how much memory
+keeping all the possible combination of mixtures in memory at once.
+
+Using the binomial coefficient we know that there are 100!/(4!*96!)=3,921,225
+different way to mix the ingredients. That is almost 4 million!
+
+If we only store the signature, as a string, we would have 43 bytes as a median
+size. We are assuming the count takes 2 characters and that every character fits
+in 1 byte. The outlier were one ingredient would be 100 (3 bytes) can be
+discounted for the purpose of estimation, since it would mean the other counts
+are 0 (1 byte).
+
+Sprinkles: 9
+Butterscotch: 12
+Chocolate: 9
+Candy: 5
+(+ 9 12 9 5 (* 2 4)) 43 bytes
+
+(* 3921225 43) 168612675 Bytes which is
+/1024 is ≅ 164660 KiB
+/1024 is ≅ 169 MiB
+So we should be able to fit everything in memory. 🤔
+
+|#
+
 (defclass ingredient ()
   ((name :initarg :name :reader name)
    (capacity :initarg :capacity :reader capacity)
