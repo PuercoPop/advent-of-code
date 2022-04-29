@@ -4,7 +4,6 @@
 
 
 (defparameter +input+ #P"9.input")
-
 (defparameter +example+ #P"9.example")
 
 ;; The queue should have always maintain the same number of elements.
