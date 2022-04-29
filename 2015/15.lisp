@@ -32,6 +32,12 @@ Candy: 5
 /1024 is ≅ 169 MiB
 So we should be able to fit everything in memory. 🤔
 
+The reason why would be because I'm starting from an empty bag and start
+branching out, keeping track of all the paths seen across the way. That would
+blow up the amount of memory required. Another approach would be to to start
+from one possible complete mix, and branch from there through the possible
+permutations.
+
 |#
 
 (defclass ingredient ()
