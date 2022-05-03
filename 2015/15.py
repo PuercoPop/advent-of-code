@@ -1,6 +1,5 @@
 import re
 import random
-import unittest
 from itertools import product
 
 def read_datasheet(input):
@@ -16,20 +15,6 @@ def read_datasheet(input):
             datasheet[name]=props
     return datasheet
 
-def initial_mix(datasheet, target):
-    m=dict()
-    for k in datasheet:
-        m[k]=0
-    m[random.choice(datasheet.keys())]=target
-    return m
-
-def mix_sig(m):
-    s=''
-    for k,v in m.items():
-        s+=k
-        s+=str(v)
-    return s
-
 def mix_score(mix, datasheet):
     props=['flavor', 'capacity', 'texture', 'durability']
     score=1
@@ -40,40 +25,36 @@ def mix_score(mix, datasheet):
         score*=max(0, sum)
     return score
 
-def find_neighbors(mix, upper_bound):
-    can_remove=[k for k,v in mix.items() if v>0]
-    can_add   =[k for k,v in mix.items() if v<upper_bound]
-    changes=[(x,y) for x in can_remove for y in can_add]
+def empty_mix(datasheet):
+    m=dict()
+    for k in datasheet:
+        m[k]=0
+    return m
+
+def next_steps(mix, upper_bound):
+    can_add=[k for k,v in mix.items() if v<upper_bound]
     neighbors=list()
-    for dec,inc in changes:
+    for inc in can_add:
         n = mix.copy()
-        n[dec]-=1
         n[inc]+=1
         neighbors.append(n)
     return neighbors
 
-
 def solve_1(input, target):
     datasheet = read_datasheet(input)
-    seed=initial_mix(datasheet, target)
-    seen=dict()
-    seen[mix_sig(seed)]=mix_score(seed,datasheet)
-    q=[seed]
-    while len(q)>0:
-        next = q.pop()
-        neighbors = find_neighbors(next, target)
-        for neighbor in neighbors:
-            if mix_sig(neighbor) not in seen.keys():
-                q.append(neighbor)
-                seen[mix_sig(neighbor)]=mix_score(neighbor,datasheet)
-    return max(seen.values())
-
-class Test(unittest.TestCase):
-    def test_mix_sig(self):
-        d= {'Butterscotch': 40,'Cinnamon': 60}
-        self.assertEqual('Butterscotch40Cinnamon60', mix_sig(d))
+    mixes=[empty_mix(datasheet)]
+    ingredient_count=0
+    while ingredient_count<target:
+        n=list()
+        for mix in mixes:
+            for m in next_steps(mix, target):
+                n.append(m)
+        mixes = n
+        max_score = max([mix_score(m, datasheet) for m in mixes])
+        mixes = [ m for m in mixes if mix_score(m, datasheet) == max_score ]
+        ingredient_count+=1
+    return max_score# , mixes, [mix_score(m, datasheet) for m in mixes]
 
 if __name__ == "__main__":
-    # unittest.main()
     # print(solve_1("15.example", 100))
     print(solve_1("15.input", 100))
