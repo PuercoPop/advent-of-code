@@ -38,6 +38,9 @@ blow up the amount of memory required. Another approach would be to to start
 from one possible complete mix, and branch from there through the possible
 permutations.
 
+Because every combination we are going to look at is a complete mix we can use
+the seen map to keep track of the bag-score.
+
 |#
 
 (defclass ingredient ()
@@ -68,11 +71,7 @@ permutations.
                  :append (funcall parse-attribute attr)))))
 (read-ingredient "Sprinkles: capacity 2, durability 0, flavor -2, texture 0, calories 3")
 
-(defun bag-count (bag)
-  (loop :for n :being :the :hash-values :of bag
-        :sum n))
-
-(defun bag-sig (x)
+(defun mix-sig (x)
   "Return a unique signature for the bag."
   (with-output-to-string (out)
     (dolist (ingredient (sort (loop :for ing :being :the :hash-keys :of x
@@ -81,7 +80,7 @@ permutations.
       (format out "~A~A" ingredient (gethash ingredient x)))))
 
 ;; Ignoring calories
-(defun bag-score (x data-sheet)
+(defun mix-score (x data-sheet)
   (reduce #'*
           (loop :for prop :in '(capacity durability flavor texture)
                 :collect (max 0
@@ -89,29 +88,37 @@ permutations.
                                     :for count :being :the :hash-value :of x
                                     :sum (* count (slot-value (gethash ingredient data-sheet) prop)))))))
 
-(defun unique-combinations (ingredient-names target)
-  (let ((seen (make-hash-table :test #'equalp))
-        (completed (queue))
-        (incomplete (queue)))
-     (loop :for i :across ingredient-names
-           :for ht := (make-hash-table :test #'equalp)
-           :do (incf (gethash i ht 0))
-               (setf (gethash (bag-sig ht) seen) t)
-               (enq ht incomplete))
-    (loop :while (qlist incomplete)
-          :for current := (deq incomplete)
-          :do
-             (if (= (bag-count current) target)
-                 (enq current completed)
-                 (let ((next (loop :for i :across ingredient-names
-                                   :for ht := (alexandria:copy-hash-table current)
-                                   :do (incf (gethash i ht 0))
-                                   :collect ht)))
-                   (loop :for n :in next
-                         :when (not (gethash (bag-sig n) seen))
-                           :do (enq n incomplete)
-                               (setf (gethash (bag-sig n) seen) t)))))
-    (qlist completed)))
+(defun initial-mix (data-sheet upper-bound)
+  (let ((ht (make-hash-table :test #'equalp)))
+    (loop :for ingredient :being :the :hash-key :of data-sheet
+          :do (setf (gethash ingredient ht) 0))
+    (with-hash-table-iterator (next data-sheet)
+      (multiple-value-bind (entryp key value)
+          (next)
+        (declare (ignore value))
+        (assert entryp () "Hash table appears to be empty.")
+        (setf (gethash key ht) upper-bound)))
+    ht))
+
+(defun ⨯ (a b)
+  (loop :for x :in a
+        :nconc (loop :for y :in b :collect (list x y))) )
+
+(defun neighboors (mix upper-bound)
+  (let* ((can-remove (loop :for k :being :the :hash-keys :of mix
+                          :for v :being :the :hash-values :of mix
+                          :when (plusp v)
+                            :collect k))
+         (can-add (loop :for k :being :the :hash-keys :of mix
+                       :for v :being :the :hash-values :of mix
+                       :when (< v upper-bound)
+                         :collect k))
+         (changes (⨯ can-remove can-add)))
+    (loop :for (del add) :in changes
+          :for ht := (alexandria:copy-hash-table mix)
+          :do (decf (gethash del ht))
+              (incf (gethash add ht))
+          :collect ht)))
 
 (defun solve/1 (input target)
   (let* ((ingredients (with-open-file (in input)
@@ -119,23 +126,32 @@ permutations.
                              :while line
                              :collect (read-ingredient line))))
          (data-sheet (loop :with ht := (make-hash-table :test #'equalp)
-                         :for ingredient :in ingredients
-                         :do (setf (gethash (name ingredient) ht) ingredient)
-                         :finally (return ht)))
-         (ingredient-names (map 'vector #'name ingredients))
-         (combinations (unique-combinations ingredient-names target)))
-    (loop :for mix :in combinations
-          :maximize (bag-score mix data-sheet))))
-
-;; (let* ((ingredients (with-open-file (in +example+)
-;;                        (loop :for line := (read-line in nil)
-;;                              :while line
-;;                              :collect (read-ingredient line))))
-;;        (data-sheet (loop :with ht := (make-hash-table :test #'equalp)
-;;                          :for ingredient :in ingredients
-;;                          :do (setf (gethash (name ingredient) ht) ingredient)
-;;                          :finally (return ht)))
-;;        (bag (make-hash-table :test #'equalp)))
-;;   (setf (gethash "Butterscotch" bag) 44)
-;;   (setf (gethash "Cinnamon" bag) 56)
-;;   (bag-score bag data-sheet))
+                           :for ingredient :in ingredients
+                           :do (setf (gethash (name ingredient) ht) ingredient)
+                           :finally (return ht)))
+         (seen (make-hash-table :test #'equalp))
+         (initial-mix (initial-mix data-sheet target))
+         (mixes (queue initial-mix)))
+    (setf (gethash (mix-sig initial-mix) seen)
+          (mix-score initial-mix data-sheet))
+    (loop :while (progn
+                   ;; (format t "Queue len: ~A~%" (qlen mixes))
+                   (not (queue-empty-p mixes)))
+          :for current := (deq mixes)
+          :for neighboors := (progn
+                               (format t "N:~%")
+                               (dolist (m (neighboors initial-mix target))
+                                 (format t "~A~%" (mix-sig m)))
+                               (format t "END:~%")
+                               (neighboors initial-mix target))
+          :do (loop :for m :in neighboors
+                    :unless (gethash (mix-sig m) seen)
+                      :do (setf (gethash (mix-sig m) seen)
+                                (mix-score initial-mix data-sheet))
+                          (format t "Queueing ~A~%" (mix-sig m))
+                          (enq m mixes)
+                    ))
+    (values seen mixes)
+    ;; (loop :for mix :in combinations
+    ;;       :maximize (bag-score mix data-sheet))
+    ))
