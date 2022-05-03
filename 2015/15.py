@@ -26,10 +26,7 @@ def mix_score(mix, datasheet):
     return score
 
 def empty_mix(datasheet):
-    m=dict()
-    for k in datasheet:
-        m[k]=0
-    return m
+    return dict([(k, 0) for k in datasheet])
 
 def next_steps(mix, upper_bound):
     can_add=[k for k,v in mix.items() if v<upper_bound]
