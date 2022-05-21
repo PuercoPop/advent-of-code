@@ -5,6 +5,6 @@
  ⍝ For part two I want to the indices of the sets that match the condition and
  ⍝ use that to select those from the powerset. Then find the shortest set and
  ⍝ count all the ones that have the same length.
- ss←(150=+/¨ps i)⊆(ps i)
+ ss←(150=+/¨ps i)⊆(ps i) ⍝ (⊢⊆⍨150=+/¨)ps i
  ls←{⍴⊃⍵}¨ss
  +/ls=⌊/ls

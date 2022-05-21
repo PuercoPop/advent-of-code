@@ -5,7 +5,7 @@
         "STRING-CASE"))
 (in-package "DAY/6")
 
-(defparameter +input-file+ #P"/home/puercopop/quicklisp/local-projects/playground/advent-of-code/2015/day6-input.txt")
+(defparameter +input-file+ #P"/home/puercopop/quicklisp/local-projects/playground/advent-of-code/2015/6.input")
 
 (defparameter *grid* (make-array '(1000 1000) :initial-element :off))
 

@@ -64,12 +64,16 @@
 
 
 ;; Improved version
-(defun part-1* (pathname)
-  (with-open-file (in +example+)
-    (loop :while (peek-char nil in nil)
-          :collect (loop :for line := (read-line in nil)
-                         :while line
-                         :until (string= line "")
-                         :collect line))))
 
-(iter (for line =))
+(defun tally-group (group)
+  (logcount (reduce #'logior (mapcar #'parse-answers group))))
+
+(defun part-1* (pathname)
+  (let ((groups (with-open-file (in pathname)
+                  (loop :while (peek-char nil in nil)
+                        :collect (loop :for line := (read-line in nil)
+                                       :while line
+                                       :until (string= line "")
+                                       :collect line)))))
+    (reduce #'+
+            (mapcar #'tally-group groups))))
